@@ -1,12 +1,14 @@
-<!-- index.html remains the same, just update main.js with this -->
+const coins = [
+  "ORCAUSDT", "HIGHUSDT", "LINAUSDT", "SOLUSDT", "BTCUSDT", "ETHUSDT",
+  "XRPUSDT", "DOGEUSDT", "MATICUSDT", "ADAUSDT", "BNBUSDT"
+  // Yahan aap 336 coins ki full list paste kar sakti hain
+];
 
-<script>
-const coins = ["ORCAUSDT", "HIGHUSDT", "LINAUSDT"]; // 336 coins ka array yahan aayega
 const root = document.getElementById("root");
 
 function createSignalCard(signal) {
   return `
-    <div style="background:#fff;border:1px solid #ccc;border-radius:10px;padding:15px;margin-bottom:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)">
+    <div class="card">
       <h3>🚀 ${signal.symbol}</h3>
       <p><strong>Entry:</strong> ${signal.entry}</p>
       <p><strong>Target:</strong> ${signal.target}</p>
@@ -20,8 +22,10 @@ function createSignalCard(signal) {
 async function fetchSignals() {
   root.innerHTML = `<p>⏳ Signals loading...</p>`;
   const results = [];
+  const maxCoins = 20; // Batch limit (20 coins fetch at a time)
 
-  for (const coin of coins) {
+  for (let i = 0; i < coins.length && i < maxCoins; i++) {
+    const coin = coins[i];
     try {
       const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coin}`);
       const data = await res.json();
@@ -30,7 +34,6 @@ async function fetchSignals() {
 
       let type = "Intraday Signal";
       let strength = 3;
-
       if (change > 10) {
         type = "Top Gainer";
         strength = 5;
@@ -50,10 +53,10 @@ async function fetchSignals() {
   }
 
   if (results.length === 0) {
-    root.innerHTML = "<p>❌ No signals found.</p>";
+    root.innerHTML = "<p>❌ No signals found. Check internet or API access.</p>";
   } else {
     root.innerHTML = `
-      <button onclick="fetchSignals()" style="padding:10px 20px;margin-bottom:15px;background:green;color:white;border:none;border-radius:5px">🔄 Refresh Signals</button>
+      <button onclick="fetchSignals()">🔄 Refresh Signals</button>
       ${results.map(createSignalCard).join("")}
     `;
   }
@@ -61,8 +64,7 @@ async function fetchSignals() {
 
 window.onload = () => {
   root.innerHTML = `
-    <button onclick="fetchSignals()" style="padding:10px 20px;margin-bottom:15px;background:green;color:white;border:none;border-radius:5px">🔄 Refresh Signals</button>
+    <button onclick="fetchSignals()">🔄 Refresh Signals</button>
     <p>📡 Click the button to load signals.</p>
   `;
 };
-</script>
