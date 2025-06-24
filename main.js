@@ -77,9 +77,17 @@ async function fetchSignals() {
       const price = parseFloat(data.lastPrice);
       const change = parseFloat(data.priceChangePercent);
 
-      const entry = price.toFixed(4);
-      const target = (price * 1.08).toFixed(4);
-      const sl = (price * 0.94).toFixed(4);
+      function formatPrice(p) {
+  if (p > 1) return p.toFixed(4);
+  if (p > 0.1) return p.toFixed(5);
+  if (p > 0.01) return p.toFixed(6);
+  return p.toFixed(8);
+}
+
+const entry = formatPrice(price);
+const target = formatPrice(price * 1.08);
+const sl = formatPrice(price * 0.94);
+
       const symbol = coin.replace("USDT", "");
       const strength = change > 10 ? 5 : change < -8 ? 4 : change > 3 ? 4 : 3;
 
