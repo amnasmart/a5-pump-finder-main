@@ -1,5 +1,5 @@
 const coins = [
-  "1INCHUSDT", "AAVEUSDT", "ACAUSDT", "ACHUSDT", "ACMUSDT", "ADAUSDT", "ADXUSDT", "AEVOUSDT",
+  "1INCHUSDT",  "ACAUSDT", "ACHUSDT", "ACMUSDT", "ADAUSDT", "ADXUSDT", "AEVOUSDT",
   "AGIXUSDT", "AGLDUSDT", "AIOZUSDT", "AIRUSDT", "AKROUSDT", "ALCXUSDT", "ALGOUSDT", "ALICEUSDT",
   "ALPACAUSDT", "ALPHAUSDT", "ALPINEUSDT", "AMBUSDT", "ANKRUSDT", "ANTUSDT", "APEUSDT", "API3USDT",
   "APXUSDT", "ARBUSDT", "ARDRUSDT", "ARKMUSDT", "ARKUSDT", "ARPAUSDT", "ASRUSDT", "ASTRUSDT",
@@ -41,12 +41,23 @@ const coins = [
   "ZENUSDT", "ZILUSDT", "ZRXUSDT"
 ];
 
+
+let currentPage = 0;
+const perPage = 10;
+
 const root = document.getElementById("root");
 
 function getPakistanTime() {
   const date = new Date();
-  const pkTime = new Date(date.getTime() + (5 * 60 * 60 * 1000));
-  return pkTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const pkTime = new Date(date.getTime() + 5 * 60 * 60 * 1000);
+  return pkTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatPrice(p) {
+  if (p > 1) return p.toFixed(4);
+  if (p > 0.1) return p.toFixed(5);
+  if (p > 0.01) return p.toFixed(6);
+  return p.toFixed(8);
 }
 
 function createSignalCard(signal) {
@@ -57,37 +68,31 @@ function createSignalCard(signal) {
       <p><strong>Target:</strong> ${signal.target}</p>
       <p><strong>Stoploss:</strong> ${signal.sl}</p>
       <p><strong>Type:</strong> ${signal.type}</p>
-      <p><strong>Strength:</strong> ${'★'.repeat(signal.strength)}${'☆'.repeat(5 - signal.strength)}</p>
+      <p><strong>Strength:</strong> ${"★".repeat(signal.strength)}${"☆".repeat(5 - signal.strength)}</p>
       <p><strong>🕒 Time:</strong> ${signal.time}</p>
     </div>
   `;
 }
 
-async function fetchSignals() {
+async function fetchSignals(page = 0) {
   root.innerHTML = `<p>⏳ Signals loading...</p>`;
   const prePump = [], gainers = [], losers = [], intraday = [];
   const now = getPakistanTime();
-  const maxCoins = 25;
 
-  for (let i = 0; i < coins.length && i < maxCoins; i++) {
-    const coin = coins[i];
+  const start = page * perPage;
+  const end = start + perPage;
+  const selectedCoins = coins.slice(start, end);
+
+  for (const coin of selectedCoins) {
     try {
       const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${coin}`);
       const data = await res.json();
       const price = parseFloat(data.lastPrice);
       const change = parseFloat(data.priceChangePercent);
 
-      function formatPrice(p) {
-  if (p > 1) return p.toFixed(4);
-  if (p > 0.1) return p.toFixed(5);
-  if (p > 0.01) return p.toFixed(6);
-  return p.toFixed(8);
-}
-
-const entry = formatPrice(price);
-const target = formatPrice(price * 1.08);
-const sl = formatPrice(price * 0.94);
-
+      const entry = formatPrice(price);
+      const target = formatPrice(price * 1.08);
+      const sl = formatPrice(price * 0.94);
       const symbol = coin.replace("USDT", "");
       const strength = change > 10 ? 5 : change < -8 ? 4 : change > 3 ? 4 : 3;
 
@@ -111,26 +116,36 @@ const sl = formatPrice(price * 0.94);
     }
   }
 
-  if (gainers.length + losers.length + prePump.length + intraday.length === 0) {
-    root.innerHTML = "<p>❌ No signals found. Check internet or API access.</p>";
-  } else {
-    root.innerHTML = `
-      <button onclick="fetchSignals()">🔄 Refresh Signals</button>
-      <h2>🔍 Pre-Pump Alerts</h2>
-      ${prePump.map(createSignalCard).join("")}
-      <h2>🚀 Top Gainers</h2>
-      ${gainers.map(createSignalCard).join("")}
-      <h2>🔁 Reversal Watch</h2>
-      ${losers.map(createSignalCard).join("")}
-      <h2>⏳ Intraday Signals</h2>
-      ${intraday.map(createSignalCard).join("")}
-    `;
+  root.innerHTML = `
+    <button onclick="fetchSignals(currentPage)">🔄 Refresh Signals</button>
+    <button onclick="previousPage()">⏪ Previous</button>
+    <button onclick="nextPage()">Next ⏩</button>
+    <p>📃 Page ${currentPage + 1} of ${Math.ceil(coins.length / perPage)}</p>
+    <h2>🔍 Pre-Pump Alerts</h2>
+    ${prePump.map(createSignalCard).join("") || "<p>None</p>"}
+    <h2>🚀 Top Gainers</h2>
+    ${gainers.map(createSignalCard).join("") || "<p>None</p>"}
+    <h2>🔁 Reversal Watch</h2>
+    ${losers.map(createSignalCard).join("") || "<p>None</p>"}
+    <h2>⏳ Intraday Signals</h2>
+    ${intraday.map(createSignalCard).join("") || "<p>None</p>"}
+  `;
+}
+
+function nextPage() {
+  if ((currentPage + 1) * perPage < coins.length) {
+    currentPage++;
+    fetchSignals(currentPage);
+  }
+}
+
+function previousPage() {
+  if (currentPage > 0) {
+    currentPage--;
+    fetchSignals(currentPage);
   }
 }
 
 window.onload = () => {
-  root.innerHTML = `
-    <button onclick="fetchSignals()">🔄 Refresh Signals</button>
-    <p>📡 Click the button to load signals.</p>
-  `;
+  fetchSignals(currentPage);
 };
