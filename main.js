@@ -44,13 +44,19 @@ const coins = [
 
 let currentPage = 0;
 const perPage = 10;
-
 const root = document.getElementById("root");
 
-function getPakistanTime() {
+function getTimeAMPM() {
   const date = new Date();
   const pkTime = new Date(date.getTime() + 5 * 60 * 60 * 1000);
-  return pkTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return {
+    formatted: pkTime.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }),
+    timestamp: pkTime.getTime(),
+  };
 }
 
 function formatPrice(p) {
@@ -67,7 +73,7 @@ function createSignalCard(signal) {
       <p><strong>Entry:</strong> ${signal.entry}</p>
       <p><strong>Target:</strong> ${signal.target}</p>
       <p><strong>Stoploss:</strong> ${signal.sl}</p>
-      <p><strong>Type:</strong> ${signal.type}</p>
+      <p><strong>Status:</strong> ${signal.status}</p>
       <p><strong>Strength:</strong> ${"★".repeat(signal.strength)}${"☆".repeat(5 - signal.strength)}</p>
       <p><strong>🕒 Time:</strong> ${signal.time}</p>
     </div>
@@ -76,8 +82,11 @@ function createSignalCard(signal) {
 
 async function fetchSignals(page = 0) {
   root.innerHTML = `<p>⏳ Signals loading...</p>`;
-  const prePump = [], gainers = [], losers = [], intraday = [];
-  const now = getPakistanTime();
+  const intraday = [];
+
+  const nowData = getTimeAMPM();
+  const nowFormatted = nowData.formatted;
+  const nowTimestamp = nowData.timestamp;
 
   const start = page * perPage;
   const end = start + perPage;
@@ -90,26 +99,39 @@ async function fetchSignals(page = 0) {
       const price = parseFloat(data.lastPrice);
       const change = parseFloat(data.priceChangePercent);
 
-      const entry = formatPrice(price);
-      const target = formatPrice(price * 1.08);
-      const sl = formatPrice(price * 0.94);
+      const entry = parseFloat(price);
+      const target = entry * 1.08;
+      const sl = entry * 0.95;
       const symbol = coin.replace("USDT", "");
       const strength = change > 10 ? 5 : change < -8 ? 4 : change > 3 ? 4 : 3;
 
-      const signal = { symbol, entry, target, sl, strength, time: now };
+      const low = parseFloat(data.lowPrice);
+      const isNearSupport = (entry - low) / entry <= 0.015;
 
-      if (change > 10) {
-        signal.type = "Top Gainer";
-        gainers.push(signal);
-      } else if (change < -8) {
-        signal.type = "Reversal Watch";
-        losers.push(signal);
-      } else if (change > 3 && change <= 8) {
-        signal.type = "Pre-Pump Alert";
-        prePump.push(signal);
-      } else {
-        signal.type = "Intraday Signal";
-        intraday.push(signal);
+      if (isNearSupport) {
+        let status = "🟢 Still Valid";
+        if (price >= target) {
+          status = "✅ Target Hit";
+        } else if (price <= sl) {
+          status = "❌ SL Hit";
+        }
+
+        const signal = {
+          symbol,
+          entry: formatPrice(entry),
+          target: formatPrice(target),
+          sl: formatPrice(sl),
+          strength,
+          time: nowFormatted,
+          timestamp: nowTimestamp,
+          status,
+          type: "Intraday Signal",
+        };
+
+        // Skip expired signals (older than 24 hours)
+        if (nowTimestamp - signal.timestamp < 86400000) {
+          intraday.push(signal);
+        }
       }
     } catch (err) {
       console.error(`Error fetching ${coin}:`, err);
@@ -121,14 +143,8 @@ async function fetchSignals(page = 0) {
     <button onclick="previousPage()">⏪ Previous</button>
     <button onclick="nextPage()">Next ⏩</button>
     <p>📃 Page ${currentPage + 1} of ${Math.ceil(coins.length / perPage)}</p>
-    <h2>🔍 Pre-Pump Alerts</h2>
-    ${prePump.map(createSignalCard).join("") || "<p>None</p>"}
-    <h2>🚀 Top Gainers</h2>
-    ${gainers.map(createSignalCard).join("") || "<p>None</p>"}
-    <h2>🔁 Reversal Watch</h2>
-    ${losers.map(createSignalCard).join("") || "<p>None</p>"}
-    <h2>⏳ Intraday Signals</h2>
-    ${intraday.map(createSignalCard).join("") || "<p>None</p>"}
+    <h2>⏳ Intraday Support-Based Signals</h2>
+    ${intraday.length > 0 ? intraday.map(createSignalCard).join("") : "<p>No valid support signals.</p>"}
   `;
 }
 
